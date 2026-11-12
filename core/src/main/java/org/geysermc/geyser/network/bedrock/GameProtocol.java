@@ -33,6 +33,22 @@ import org.cloudburstmc.protocol.bedrock.codec.v2168.Bedrock_v2168_hotfix4;
 import org.cloudburstmc.protocol.bedrock.codec.v2169.Bedrock_v2169;
 import org.cloudburstmc.protocol.bedrock.codec.v2193.Bedrock_v2193;
 import org.cloudburstmc.protocol.bedrock.codec.v2225.Bedrock_v2225;
+import org.cloudburstmc.protocol.bedrock.codec.v685.Bedrock_v685;
+import org.cloudburstmc.protocol.bedrock.codec.v686.Bedrock_v686;
+import org.cloudburstmc.protocol.bedrock.codec.v712.Bedrock_v712;
+import org.cloudburstmc.protocol.bedrock.codec.v729.Bedrock_v729;
+import org.cloudburstmc.protocol.bedrock.codec.v748.Bedrock_v748;
+import org.cloudburstmc.protocol.bedrock.codec.v766.Bedrock_v766;
+import org.cloudburstmc.protocol.bedrock.codec.v776.Bedrock_v776;
+import org.cloudburstmc.protocol.bedrock.codec.v786.Bedrock_v786;
+import org.cloudburstmc.protocol.bedrock.codec.v800.Bedrock_v800;
+import org.cloudburstmc.protocol.bedrock.codec.v818.Bedrock_v818;
+import org.cloudburstmc.protocol.bedrock.codec.v819.Bedrock_v819;
+import org.cloudburstmc.protocol.bedrock.codec.v827.Bedrock_v827;
+import org.cloudburstmc.protocol.bedrock.codec.v844.Bedrock_v844;
+import org.cloudburstmc.protocol.bedrock.codec.v859.Bedrock_v859;
+import org.cloudburstmc.protocol.bedrock.codec.v860.Bedrock_v860;
+import org.cloudburstmc.protocol.bedrock.codec.v898.Bedrock_v898;
 import org.cloudburstmc.protocol.bedrock.netty.codec.packet.BedrockPacketCodec;
 import org.geysermc.geyser.api.util.MinecraftVersion;
 import org.geysermc.geyser.impl.MinecraftVersionImpl;
@@ -82,6 +98,22 @@ public final class GameProtocol {
 
     static {
         // Strict ordering
+        register(Bedrock_v685.CODEC, "1.21.0", "1.21.1");
+        register(Bedrock_v686.CODEC, "1.21.2", "1.21.3");
+        register(Bedrock_v712.CODEC, "1.21.20", "1.21.21", "1.21.22", "1.21.23");
+        register(Bedrock_v729.CODEC, "1.21.30", "1.21.31", "1.21.32", "1.21.33");
+        register(Bedrock_v748.CODEC, "1.21.40", "1.21.41", "1.21.42", "1.21.43", "1.21.44");
+        register(Bedrock_v766.CODEC, "1.21.50", "1.21.51");
+        register(Bedrock_v776.CODEC, "1.21.60", "1.21.61", "1.21.62");
+        register(Bedrock_v786.CODEC, "1.21.70", "1.21.71", "1.21.72", "1.21.73");
+        register(Bedrock_v800.CODEC, "1.21.80", "1.21.81", "1.21.82", "1.21.83", "1.21.84");
+        register(Bedrock_v818.CODEC, "1.21.90", "1.21.91", "1.21.92");
+        register(Bedrock_v819.CODEC, "1.21.93", "1.21.94");
+        register(Bedrock_v827.CODEC, "1.21.100", "1.21.101");
+        register(Bedrock_v844.CODEC, "1.21.110", "1.21.111", "1.21.112", "1.21.113", "1.21.114");
+        register(Bedrock_v859.CODEC, "1.21.120", "1.21.121", "1.21.122", "1.21.123");
+        register(Bedrock_v860.CODEC, "1.21.124");
+        register(Bedrock_v898.CODEC, "1.21.130", "1.21.131", "1.21.132");
         register(Bedrock_v2168_hotfix4.CODEC, "26.40", "26.41", "26.42", "26.43", "26.44");
         register(Bedrock_v2169.CODEC, "26.45");
         register(Bedrock_v2193.CODEC, "26.50", "26.51", "26.52");

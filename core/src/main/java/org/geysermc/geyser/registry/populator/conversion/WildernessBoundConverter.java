@@ -245,4 +245,11 @@ public class WildernessBoundConverter extends ICanHasMoreStates {
     public static Map<Item, Item> itemMappings() {
         return ITEM_MAPPINGS;
     }
+
+    /**
+     * @return the 26.40 block identifier that the given newer block should be downgraded to, or null
+     */
+    public static String blockFallback(String identifier) {
+        return BLOCK_MAPPINGS.get(identifier);
+    }
 }

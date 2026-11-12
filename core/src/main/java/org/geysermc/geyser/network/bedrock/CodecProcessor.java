@@ -28,7 +28,9 @@ package org.geysermc.geyser.network.bedrock;
 import io.netty.buffer.ByteBuf;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodec;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockCodecHelper;
+import org.cloudburstmc.protocol.bedrock.codec.BedrockPacketDefinition;
 import org.cloudburstmc.protocol.bedrock.codec.BedrockPacketSerializer;
+import org.cloudburstmc.protocol.bedrock.codec.v1001.Bedrock_v1001;
 import org.cloudburstmc.protocol.bedrock.codec.v1001.serializer.BossEventSerializer_v1001;
 import org.cloudburstmc.protocol.bedrock.codec.v1001.serializer.InventoryContentSerializer_v1001;
 import org.cloudburstmc.protocol.bedrock.codec.v1001.serializer.MobArmorEquipmentSerializer_v1001;
@@ -40,6 +42,7 @@ import org.cloudburstmc.protocol.bedrock.codec.v291.serializer.PlayerHotbarSeria
 import org.cloudburstmc.protocol.bedrock.codec.v291.serializer.SetEntityLinkSerializer_v291;
 import org.cloudburstmc.protocol.bedrock.codec.v557.serializer.SetEntityDataSerializer_v557;
 import org.cloudburstmc.protocol.bedrock.codec.v662.serializer.SetEntityMotionSerializer_v662;
+import org.cloudburstmc.protocol.bedrock.codec.v975.Bedrock_v975;
 import org.cloudburstmc.protocol.bedrock.codec.v975.serializer.InventorySlotSerializer_v975;
 import org.cloudburstmc.protocol.bedrock.codec.v975.serializer.MobEquipmentSerializer_v975;
 import org.cloudburstmc.protocol.bedrock.codec.v975.serializer.MoveEntityAbsoluteSerializer_v975;
@@ -255,6 +258,19 @@ public class CodecProcessor {
         }
     }
 
+    private static <T extends BedrockPacket> void updateSerializerIfCompatible(BedrockCodec.Builder builder, BedrockCodec codec,
+                                                                               Class<T> packetClass, BedrockPacketSerializer<T> serializer) {
+        BedrockPacketDefinition<T> definition = codec.getPacketDefinition(packetClass);
+        if (definition == null) {
+            return;
+        }
+        // Only replace the serializer when the codec's own serializer is a parent of ours, so we never
+        // write a newer packet layout to an older client.
+        if (definition.getSerializer().getClass().isAssignableFrom(serializer.getClass())) {
+            builder.updateSerializer(packetClass, serializer);
+        }
+    }
+
     @SuppressWarnings("unchecked")
     static BedrockCodec processCodec(BedrockCodec codec) {
         BedrockCodec.Builder codecBuilder = codec.toBuilder()
@@ -289,21 +305,32 @@ public class CodecProcessor {
             .updateSerializer(ClientCacheStatusPacket.class, IGNORED_SERIALIZER)
             .updateSerializer(SimpleEventPacket.class, IGNORED_SERIALIZER)
             .updateSerializer(MultiplayerSettingsPacket.class, IGNORED_SERIALIZER)
-            .updateSerializer(EmoteListPacket.class, IGNORED_SERIALIZER)
-            // Ignored only when serverbound
-            .updateSerializer(PlayerHotbarPacket.class, PLAYER_HOTBAR_SERIALIZER)
-            .updateSerializer(SetEntityDataPacket.class, SET_ENTITY_DATA_SERIALIZER)
-            .updateSerializer(SetEntityMotionPacket.class, SET_ENTITY_MOTION_SERIALIZER)
-            .updateSerializer(SetEntityLinkPacket.class, SET_ENTITY_LINK_SERIALIZER)
-            .updateSerializer(MobArmorEquipmentPacket.class, MOB_ARMOR_EQUIPMENT_SERIALIZER)
-            .updateSerializer(PlayerSkinPacket.class, PLAYER_SKIN_SERIALIZER)
+            .updateSerializer(EmoteListPacket.class, IGNORED_SERIALIZER);
+
+        // The serializers referenced below belong to newer protocol versions. Only use them on codecs whose
+        // serializer is compatible, otherwise the packets we send to older clients would be malformed.
+        int protocolVersion = codec.getProtocolVersion();
+
+        updateSerializerIfCompatible(codecBuilder, codec, PlayerHotbarPacket.class, PLAYER_HOTBAR_SERIALIZER);
+        updateSerializerIfCompatible(codecBuilder, codec, SetEntityDataPacket.class, SET_ENTITY_DATA_SERIALIZER);
+        updateSerializerIfCompatible(codecBuilder, codec, SetEntityMotionPacket.class, SET_ENTITY_MOTION_SERIALIZER);
+        updateSerializerIfCompatible(codecBuilder, codec, SetEntityLinkPacket.class, SET_ENTITY_LINK_SERIALIZER);
+
+        if (protocolVersion >= Bedrock_v975.CODEC.getProtocolVersion()) {
+            // Illegal only when serverbound / skips over some unused fields
+            updateSerializerIfCompatible(codecBuilder, codec, InventorySlotPacket.class, INVENTORY_SLOT_SERIALIZER);
+            updateSerializerIfCompatible(codecBuilder, codec, MoveEntityAbsolutePacket.class, MOVE_ENTITY_SERIALIZER);
+            updateSerializerIfCompatible(codecBuilder, codec, MobEquipmentPacket.class, MOB_EQUIPMENT_SERIALIZER);
+        }
+        if (protocolVersion >= Bedrock_v1001.CODEC.getProtocolVersion()) {
             // Illegal only when serverbound
-            .updateSerializer(InventoryContentPacket.class, INVENTORY_CONTENT_SERIALIZER)
-            .updateSerializer(InventorySlotPacket.class, INVENTORY_SLOT_SERIALIZER)
-            .updateSerializer(MoveEntityAbsolutePacket.class, MOVE_ENTITY_SERIALIZER)
-            .updateSerializer(MovePlayerPacket.class, MOVE_PLAYER_SERIALIZER)
-            // Skips over some unused fields
-            .updateSerializer(MobEquipmentPacket.class, MOB_EQUIPMENT_SERIALIZER);
+            updateSerializerIfCompatible(codecBuilder, codec, InventoryContentPacket.class, INVENTORY_CONTENT_SERIALIZER);
+            updateSerializerIfCompatible(codecBuilder, codec, MobArmorEquipmentPacket.class, MOB_ARMOR_EQUIPMENT_SERIALIZER);
+        }
+        if (protocolVersion >= Bedrock_v2168.CODEC.getProtocolVersion()) {
+            updateSerializerIfCompatible(codecBuilder, codec, PlayerSkinPacket.class, PLAYER_SKIN_SERIALIZER);
+            updateSerializerIfCompatible(codecBuilder, codec, MovePlayerPacket.class, MOVE_PLAYER_SERIALIZER);
+        }
 
         boolean legacyReceiptPackets = Boolean.getBoolean("Geyser.ReceiptPackets");
         if (legacyReceiptPackets) {
@@ -323,10 +350,9 @@ public class CodecProcessor {
             }
         }
 
-        if (GameProtocol.is26_50orHigher(codec.getProtocolVersion())) {
-            codecBuilder.updateSerializer(BossEventPacket.class, BOSS_EVENT_SERIALIZER_V2193);
-        } else {
-            codecBuilder.updateSerializer(BossEventPacket.class, BOSS_EVENT_SERIALIZER_V1001);
+        if (protocolVersion >= Bedrock_v1001.CODEC.getProtocolVersion()) {
+            updateSerializerIfCompatible(codecBuilder, codec, BossEventPacket.class,
+                GameProtocol.is26_50orHigher(protocolVersion) ? BOSS_EVENT_SERIALIZER_V2193 : BOSS_EVENT_SERIALIZER_V1001);
         }
 
         return codecBuilder.build();

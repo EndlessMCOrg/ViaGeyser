@@ -47,6 +47,20 @@ import org.cloudburstmc.nbt.NbtUtils;
 import org.cloudburstmc.protocol.bedrock.codec.v2168.Bedrock_v2168;
 import org.cloudburstmc.protocol.bedrock.codec.v2193.Bedrock_v2193;
 import org.cloudburstmc.protocol.bedrock.codec.v2225.Bedrock_v2225;
+import org.cloudburstmc.protocol.bedrock.codec.v685.Bedrock_v685;
+import org.cloudburstmc.protocol.bedrock.codec.v712.Bedrock_v712;
+import org.cloudburstmc.protocol.bedrock.codec.v729.Bedrock_v729;
+import org.cloudburstmc.protocol.bedrock.codec.v748.Bedrock_v748;
+import org.cloudburstmc.protocol.bedrock.codec.v766.Bedrock_v766;
+import org.cloudburstmc.protocol.bedrock.codec.v776.Bedrock_v776;
+import org.cloudburstmc.protocol.bedrock.codec.v786.Bedrock_v786;
+import org.cloudburstmc.protocol.bedrock.codec.v800.Bedrock_v800;
+import org.cloudburstmc.protocol.bedrock.codec.v818.Bedrock_v818;
+import org.cloudburstmc.protocol.bedrock.codec.v819.Bedrock_v819;
+import org.cloudburstmc.protocol.bedrock.codec.v827.Bedrock_v827;
+import org.cloudburstmc.protocol.bedrock.codec.v844.Bedrock_v844;
+import org.cloudburstmc.protocol.bedrock.codec.v859.Bedrock_v859;
+import org.cloudburstmc.protocol.bedrock.codec.v898.Bedrock_v898;
 import org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition;
 import org.cloudburstmc.protocol.bedrock.data.definitions.ItemDefinition;
 import org.cloudburstmc.protocol.bedrock.data.definitions.SimpleItemDefinition;
@@ -83,6 +97,7 @@ import org.geysermc.geyser.registry.BlockRegistries;
 import org.geysermc.geyser.registry.Registries;
 import org.geysermc.geyser.registry.java.BuiltInJavaRegistries;
 import org.geysermc.geyser.registry.populator.conversion.ItemRemapper;
+import org.geysermc.geyser.registry.populator.conversion.LegacyItemFallbacks;
 import org.geysermc.geyser.registry.populator.conversion.WildernessBoundConverter;
 import org.geysermc.geyser.registry.type.BlockMappings;
 import org.geysermc.geyser.registry.type.CustomSkull;
@@ -146,7 +161,21 @@ public class ItemRegistryPopulator {
 
     // TODO: ideally split the populating of the Java ITEM registry (non-vanilla items) from the populating of item mappings
     public static void populate() {
-        List<PaletteVersion> paletteVersions = new ArrayList<>(4);
+        List<PaletteVersion> paletteVersions = new ArrayList<>(16);
+        paletteVersions.add(new PaletteVersion("1_21_0", Bedrock_v685.CODEC.getProtocolVersion(), WildernessBoundConverter.itemMappings()));
+        paletteVersions.add(new PaletteVersion("1_21_20", Bedrock_v712.CODEC.getProtocolVersion(), WildernessBoundConverter.itemMappings()));
+        paletteVersions.add(new PaletteVersion("1_21_30", Bedrock_v729.CODEC.getProtocolVersion(), WildernessBoundConverter.itemMappings()));
+        paletteVersions.add(new PaletteVersion("1_21_40", Bedrock_v748.CODEC.getProtocolVersion(), WildernessBoundConverter.itemMappings()));
+        paletteVersions.add(new PaletteVersion("1_21_50", Bedrock_v766.CODEC.getProtocolVersion(), WildernessBoundConverter.itemMappings()));
+        paletteVersions.add(new PaletteVersion("1_21_60", Bedrock_v776.CODEC.getProtocolVersion(), WildernessBoundConverter.itemMappings()));
+        paletteVersions.add(new PaletteVersion("1_21_70", Bedrock_v786.CODEC.getProtocolVersion(), WildernessBoundConverter.itemMappings()));
+        paletteVersions.add(new PaletteVersion("1_21_80", Bedrock_v800.CODEC.getProtocolVersion(), WildernessBoundConverter.itemMappings()));
+        paletteVersions.add(new PaletteVersion("1_21_90", Bedrock_v818.CODEC.getProtocolVersion(), WildernessBoundConverter.itemMappings()));
+        paletteVersions.add(new PaletteVersion("1_21_93", Bedrock_v819.CODEC.getProtocolVersion(), WildernessBoundConverter.itemMappings()));
+        paletteVersions.add(new PaletteVersion("1_21_100", Bedrock_v827.CODEC.getProtocolVersion(), WildernessBoundConverter.itemMappings()));
+        paletteVersions.add(new PaletteVersion("1_21_110", Bedrock_v844.CODEC.getProtocolVersion(), WildernessBoundConverter.itemMappings()));
+        paletteVersions.add(new PaletteVersion("1_21_120", Bedrock_v859.CODEC.getProtocolVersion(), WildernessBoundConverter.itemMappings()));
+        paletteVersions.add(new PaletteVersion("1_21_130", Bedrock_v898.CODEC.getProtocolVersion(), WildernessBoundConverter.itemMappings()));
         paletteVersions.add(new PaletteVersion("26_40", Bedrock_v2168.CODEC.getProtocolVersion(), WildernessBoundConverter.itemMappings()));
         paletteVersions.add(new PaletteVersion("26_50", Bedrock_v2193.CODEC.getProtocolVersion()));
         paletteVersions.add(new PaletteVersion("26_60", Bedrock_v2225.CODEC.getProtocolVersion()));
@@ -182,11 +211,16 @@ public class ItemRegistryPopulator {
                 throw new AssertionError("Unable to load Bedrock runtime item IDs", e);
             }
 
-            NbtMap vanillaComponents;
-            try (InputStream stream = bootstrap.getResourceOrThrow("bedrock/item_components.%s.nbt".formatted(palette.version()))) {
-                vanillaComponents = (NbtMap) NbtUtils.createGZIPReader(stream, true, true).readTag();
-            } catch (Exception e) {
-                throw new AssertionError("Unable to load Bedrock item components", e);
+            NbtMap vanillaComponents = NbtMap.EMPTY;
+            InputStream componentsStream = bootstrap.getResourceOrNull("bedrock/item_components.%s.nbt".formatted(palette.version()));
+            if (componentsStream != null) {
+                try (componentsStream) {
+                    vanillaComponents = (NbtMap) NbtUtils.createGZIPReader(componentsStream, true, true).readTag();
+                } catch (Exception e) {
+                    throw new AssertionError("Unable to load Bedrock item components", e);
+                }
+            } else if (!palette.version().startsWith("1_21_")) {
+                throw new AssertionError("Unable to load Bedrock item components for " + palette.version());
             }
 
             // Used for custom items
@@ -311,12 +345,24 @@ public class ItemRegistryPopulator {
 
                 String bedrockIdentifier = mappingItem.getBedrockIdentifier();
                 ItemDefinition definition = definitions.get(bedrockIdentifier);
+                boolean usedLegacyFallback = false;
+                if (definition == null && palette.version().startsWith("1_21_")) {
+                    // Items added after this Bedrock version cannot be represented on it
+                    String fallbackIdentifier = LegacyItemFallbacks.fallback(bedrockIdentifier);
+                    ItemDefinition fallbackDefinition = definitions.get(fallbackIdentifier);
+                    if (fallbackDefinition != null) {
+                        mappingItem = mappingItem.withBedrockIdentifier(fallbackIdentifier);
+                        bedrockIdentifier = fallbackIdentifier;
+                        definition = fallbackDefinition;
+                        usedLegacyFallback = true;
+                    }
+                }
                 if (definition == null) {
                     throw new RuntimeException("Missing Bedrock ItemDefinition in version " + palette.version() + " for mapping: " + mappingItem);
                 }
 
                 BlockDefinition bedrockBlock = null;
-                Integer firstBlockRuntimeId = entry.getValue().getFirstBlockRuntimeId();
+                Integer firstBlockRuntimeId = usedLegacyFallback ? null : entry.getValue().getFirstBlockRuntimeId();
                 BlockDefinition customBlockItemOverride = null;
                 if (firstBlockRuntimeId != null) {
                     BlockDefinition blockOverride = bedrockBlockIdOverrides.get(bedrockIdentifier);

@@ -36,6 +36,16 @@ import it.unimi.dsi.fastutil.objects.ObjectIntPair;
 import org.cloudburstmc.protocol.bedrock.codec.v2168.Bedrock_v2168;
 import org.cloudburstmc.protocol.bedrock.codec.v2193.Bedrock_v2193;
 import org.cloudburstmc.protocol.bedrock.codec.v2225.Bedrock_v2225;
+import org.cloudburstmc.protocol.bedrock.codec.v685.Bedrock_v685;
+import org.cloudburstmc.protocol.bedrock.codec.v748.Bedrock_v748;
+import org.cloudburstmc.protocol.bedrock.codec.v766.Bedrock_v766;
+import org.cloudburstmc.protocol.bedrock.codec.v776.Bedrock_v776;
+import org.cloudburstmc.protocol.bedrock.codec.v786.Bedrock_v786;
+import org.cloudburstmc.protocol.bedrock.codec.v818.Bedrock_v818;
+import org.cloudburstmc.protocol.bedrock.codec.v827.Bedrock_v827;
+import org.cloudburstmc.protocol.bedrock.codec.v844.Bedrock_v844;
+import org.cloudburstmc.protocol.bedrock.codec.v859.Bedrock_v859;
+import org.cloudburstmc.protocol.bedrock.codec.v898.Bedrock_v898;
 import org.geysermc.geyser.GeyserBootstrap;
 import org.geysermc.geyser.GeyserImpl;
 import org.geysermc.geyser.item.type.Item;
@@ -71,6 +81,16 @@ public final class TagRegistryPopulator {
         };
 
         List<ObjectIntPair<String>> paletteVersions = List.of(
+            ObjectIntPair.of("1_21_0", Bedrock_v685.CODEC.getProtocolVersion()),
+            ObjectIntPair.of("1_21_40", Bedrock_v748.CODEC.getProtocolVersion()),
+            ObjectIntPair.of("1_21_50", Bedrock_v766.CODEC.getProtocolVersion()),
+            ObjectIntPair.of("1_21_60", Bedrock_v776.CODEC.getProtocolVersion()),
+            ObjectIntPair.of("1_21_70", Bedrock_v786.CODEC.getProtocolVersion()),
+            ObjectIntPair.of("1_21_90", Bedrock_v818.CODEC.getProtocolVersion()),
+            ObjectIntPair.of("1_21_100", Bedrock_v827.CODEC.getProtocolVersion()),
+            ObjectIntPair.of("1_21_110", Bedrock_v844.CODEC.getProtocolVersion()),
+            ObjectIntPair.of("1_21_120", Bedrock_v859.CODEC.getProtocolVersion()),
+            ObjectIntPair.of("1_21_130", Bedrock_v898.CODEC.getProtocolVersion()),
             ObjectIntPair.of("26_30", Bedrock_v2168.CODEC.getProtocolVersion()),
             ObjectIntPair.of("26_30", Bedrock_v2193.CODEC.getProtocolVersion()),
             ObjectIntPair.of("26_30", Bedrock_v2225.CODEC.getProtocolVersion())
@@ -82,8 +102,19 @@ public final class TagRegistryPopulator {
         for (var palette : paletteVersions) {
             ItemMappings mappings = Registries.ITEMS.forVersion(palette.rightInt());
 
+            InputStream resourceStream = bootstrap.getResourceOrNull(String.format("bedrock/item_tags.%s.json", palette.left()));
+            if (resourceStream == null) {
+                // Older versions did not have item tags yet; make sure the base version has an entry so
+                // lookups above it fall back to an empty map instead of throwing.
+                if (palette.left().equals("1_21_0")) {
+                    //noinspection UnstableApiUsage
+                    Registries.TAGS.register(palette.rightInt(), new Object2ObjectOpenCustomHashMap<>(hashStrategy));
+                }
+                continue;
+            }
+
             Map<String, List<String>> bedrockTags;
-            try (InputStream stream = bootstrap.getResourceOrThrow(String.format("bedrock/item_tags.%s.json", palette.left()))) {
+            try (InputStream stream = resourceStream) {
                 bedrockTags = GSON.fromJson(new InputStreamReader(stream), type);
             } catch (Exception e) {
                 throw new AssertionError("Unable to load Bedrock runtime item IDs", e);

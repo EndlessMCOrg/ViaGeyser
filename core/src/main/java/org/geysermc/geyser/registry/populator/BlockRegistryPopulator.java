@@ -47,6 +47,18 @@ import org.cloudburstmc.nbt.NbtUtils;
 import org.cloudburstmc.protocol.bedrock.codec.v2168.Bedrock_v2168;
 import org.cloudburstmc.protocol.bedrock.codec.v2193.Bedrock_v2193;
 import org.cloudburstmc.protocol.bedrock.codec.v2225.Bedrock_v2225;
+import org.cloudburstmc.protocol.bedrock.codec.v685.Bedrock_v685;
+import org.cloudburstmc.protocol.bedrock.codec.v712.Bedrock_v712;
+import org.cloudburstmc.protocol.bedrock.codec.v729.Bedrock_v729;
+import org.cloudburstmc.protocol.bedrock.codec.v748.Bedrock_v748;
+import org.cloudburstmc.protocol.bedrock.codec.v766.Bedrock_v766;
+import org.cloudburstmc.protocol.bedrock.codec.v776.Bedrock_v776;
+import org.cloudburstmc.protocol.bedrock.codec.v786.Bedrock_v786;
+import org.cloudburstmc.protocol.bedrock.codec.v800.Bedrock_v800;
+import org.cloudburstmc.protocol.bedrock.codec.v818.Bedrock_v818;
+import org.cloudburstmc.protocol.bedrock.codec.v827.Bedrock_v827;
+import org.cloudburstmc.protocol.bedrock.codec.v844.Bedrock_v844;
+import org.cloudburstmc.protocol.bedrock.codec.v898.Bedrock_v898;
 import org.cloudburstmc.protocol.bedrock.data.BlockPropertyData;
 import org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition;
 import org.geysermc.geyser.GeyserImpl;
@@ -63,6 +75,7 @@ import org.geysermc.geyser.registry.java.BuiltInJavaRegistries;
 import org.geysermc.geyser.registry.populator.conversion.BlockRemapper;
 import org.geysermc.geyser.registry.populator.conversion.ICanHasMoreStates;
 import org.geysermc.geyser.registry.populator.conversion.ICanHasStates;
+import org.geysermc.geyser.registry.populator.conversion.LegacyBlockConverter;
 import org.geysermc.geyser.registry.type.BlockMappings;
 import org.geysermc.geyser.registry.type.GeyserBedrockBlock;
 import org.geysermc.geyser.util.JsonUtils;
@@ -123,6 +136,18 @@ public final class BlockRegistryPopulator {
 
     private static void registerBedrockBlocks() {
         ImmutableMap<ObjectIntPair<String>, BlockRemapper> blockMappers = ImmutableMap.<ObjectIntPair<String>, BlockRemapper>builder()
+                .put(ObjectIntPair.of("1_21_0", Bedrock_v685.CODEC.getProtocolVersion()), tag -> tag)
+                .put(ObjectIntPair.of("1_21_20", Bedrock_v712.CODEC.getProtocolVersion()), tag -> tag)
+                .put(ObjectIntPair.of("1_21_30", Bedrock_v729.CODEC.getProtocolVersion()), tag -> tag)
+                .put(ObjectIntPair.of("1_21_40", Bedrock_v748.CODEC.getProtocolVersion()), tag -> tag)
+                .put(ObjectIntPair.of("1_21_50", Bedrock_v766.CODEC.getProtocolVersion()), tag -> tag)
+                .put(ObjectIntPair.of("1_21_60", Bedrock_v776.CODEC.getProtocolVersion()), tag -> tag)
+                .put(ObjectIntPair.of("1_21_70", Bedrock_v786.CODEC.getProtocolVersion()), tag -> tag)
+                .put(ObjectIntPair.of("1_21_80", Bedrock_v800.CODEC.getProtocolVersion()), tag -> tag)
+                .put(ObjectIntPair.of("1_21_90", Bedrock_v818.CODEC.getProtocolVersion()), tag -> tag)
+                .put(ObjectIntPair.of("1_21_100", Bedrock_v827.CODEC.getProtocolVersion()), tag -> tag)
+                .put(ObjectIntPair.of("1_21_110", Bedrock_v844.CODEC.getProtocolVersion()), tag -> tag)
+                .put(ObjectIntPair.of("1_21_130", Bedrock_v898.CODEC.getProtocolVersion()), tag -> tag)
                 .put(ObjectIntPair.of("26_40", Bedrock_v2168.CODEC.getProtocolVersion()), ICanHasStates.INSTANCE)
                 .put(ObjectIntPair.of("26_50", Bedrock_v2193.CODEC.getProtocolVersion()), ICanHasMoreStates.INSTANCE)
                 .put(ObjectIntPair.of("26_60", Bedrock_v2225.CODEC.getProtocolVersion()), tag -> tag)
@@ -135,8 +160,10 @@ public final class BlockRegistryPopulator {
 
         for (ObjectIntPair<String> palette : blockMappers.keySet()) {
             int protocolVersion = palette.valueInt();
+            boolean legacyPalette = palette.key().startsWith("1_21_");
             List<NbtMap> vanillaBlockStates;
             List<NbtMap> blockStates;
+            Map<String, NbtMap> vanillaTagsByName = new Object2ObjectOpenHashMap<>();
             try (InputStream stream = GeyserImpl.getInstance().getBootstrap().getResourceOrThrow(String.format("bedrock/block_palette.%s.nbt", palette.key()));
                 NBTInputStream nbtInputStream = new NBTInputStream(new DataInputStream(new GZIPInputStream(stream)), true, true)) {
                 NbtMap blockPalette = (NbtMap) nbtInputStream.readTag();
@@ -154,6 +181,10 @@ public final class BlockRegistryPopulator {
                 }
 
                 blockStates = new ArrayList<>(vanillaBlockStates);
+
+                for (NbtMap tag : vanillaBlockStates) {
+                    vanillaTagsByName.putIfAbsent(tag.getString("name"), tag);
+                }
             } catch (Exception e) {
                 throw new AssertionError("Unable to get blocks from runtime block states", e);
             }
@@ -232,7 +263,7 @@ public final class BlockRegistryPopulator {
             BlockDefinition movingBlockDefinition = null;
             Iterator<NbtMap> blocksIterator = BLOCKS_NBT.iterator();
 
-            BlockRemapper stateMapper = blockMappers.get(palette);
+            BlockRemapper stateMapper = legacyPalette ? new LegacyBlockConverter(vanillaBlockStates) : blockMappers.get(palette);
 
             GeyserBedrockBlock[] javaToBedrockBlocks = new GeyserBedrockBlock[JAVA_BLOCKS_SIZE];
             GeyserBedrockBlock[] javaToVanillaBedrockBlocks = new GeyserBedrockBlock[JAVA_BLOCKS_SIZE];
@@ -267,6 +298,15 @@ public final class BlockRegistryPopulator {
                 NbtMap bedrockTag = stateMapper.remapBlock(originalBedrockTag);
 
                 GeyserBedrockBlock vanillaBedrockDefinition = blockStateOrderedMap.get(bedrockTag);
+                if (vanillaBedrockDefinition == null && legacyPalette) {
+                    // Legacy versions do not contain blocks added after they were released.
+                    // Fall back to the first state of the same block, or air if the block is unknown.
+                    NbtMap paletteTag = vanillaTagsByName.get(bedrockTag.getString("name"));
+                    if (paletteTag == null) {
+                        paletteTag = vanillaTagsByName.get("minecraft:air");
+                    }
+                    vanillaBedrockDefinition = blockStateOrderedMap.get(paletteTag);
+                }
 
                 GeyserBedrockBlock bedrockDefinition;
                 CustomBlockState blockStateOverride = BlockRegistries.CUSTOM_BLOCK_STATE_OVERRIDES.get(javaRuntimeId);
