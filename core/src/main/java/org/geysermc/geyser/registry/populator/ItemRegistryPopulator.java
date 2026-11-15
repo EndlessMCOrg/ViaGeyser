@@ -202,6 +202,7 @@ public class ItemRegistryPopulator {
 
         /* Load item palette */
         for (PaletteVersion palette : paletteVersions) {
+            boolean legacyPalette = palette.version().startsWith("1_21_");
             Type paletteEntriesType = new TypeToken<List<PaletteItem>>() { }.getType();
 
             List<PaletteItem> itemEntries;
@@ -345,16 +346,15 @@ public class ItemRegistryPopulator {
 
                 String bedrockIdentifier = mappingItem.getBedrockIdentifier();
                 ItemDefinition definition = definitions.get(bedrockIdentifier);
-                boolean usedLegacyFallback = false;
-                if (definition == null && palette.version().startsWith("1_21_")) {
-                    // Items added after this Bedrock version cannot be represented on it
-                    String fallbackIdentifier = LegacyItemFallbacks.fallback(bedrockIdentifier);
-                    ItemDefinition fallbackDefinition = definitions.get(fallbackIdentifier);
-                    if (fallbackDefinition != null) {
-                        mappingItem = mappingItem.withBedrockIdentifier(fallbackIdentifier);
-                        bedrockIdentifier = fallbackIdentifier;
-                        definition = fallbackDefinition;
-                        usedLegacyFallback = true;
+                if (definition == null && legacyPalette) {
+                    // Items added after this Bedrock version cannot be represented on it. Resolve against the
+                    // identifiers that actually exist in this palette instead of assuming a fixed rename chain.
+                    LegacyItemFallbacks.Fallback fallback = LegacyItemFallbacks.firstAvailable(
+                        bedrockIdentifier, mappingItem.getBedrockData(), definitions::containsKey);
+                    definition = definitions.get(fallback.identifier());
+                    if (definition != null) {
+                        mappingItem = mappingItem.withBedrockIdentifier(fallback.identifier()).withBedrockData(fallback.data());
+                        bedrockIdentifier = fallback.identifier();
                     }
                 }
                 if (definition == null) {
@@ -362,7 +362,9 @@ public class ItemRegistryPopulator {
                 }
 
                 BlockDefinition bedrockBlock = null;
-                Integer firstBlockRuntimeId = usedLegacyFallback ? null : entry.getValue().getFirstBlockRuntimeId();
+                // The block runtime IDs in the mappings are generated for the newest palette, so they cannot be
+                // used to find blocks in a legacy palette. Use the identifier-based creative lookup instead.
+                Integer firstBlockRuntimeId = legacyPalette ? null : entry.getValue().getFirstBlockRuntimeId();
                 BlockDefinition customBlockItemOverride = null;
                 if (firstBlockRuntimeId != null) {
                     BlockDefinition blockOverride = bedrockBlockIdOverrides.get(bedrockIdentifier);
@@ -530,6 +532,20 @@ public class ItemRegistryPopulator {
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+
+                if (legacyPalette && entry.getValue().getFirstBlockRuntimeId() != null) {
+                    // The block runtime ID in the mappings belongs to the newest palette. Creative items are
+                    // generated per palette, so use those to find the block definition for this identifier.
+                    BlockDefinition blockOverride = bedrockBlockIdOverrides.get(bedrockIdentifier);
+                    if (blockOverride != null) {
+                        bedrockBlock = blockOverride;
+                    } else {
+                        Integer blacklistedRuntimeId = blacklistedIdentifiers.get(bedrockIdentifier);
+                        if (blacklistedRuntimeId != null) {
+                            bedrockBlock = blockMappings.getDefinition(blacklistedRuntimeId);
                         }
                     }
                 }

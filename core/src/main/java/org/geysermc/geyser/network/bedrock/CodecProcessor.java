@@ -258,6 +258,13 @@ public class CodecProcessor {
         }
     }
 
+    private static <T extends BedrockPacket> void updateSerializerIfPresent(BedrockCodec.Builder builder, BedrockCodec codec,
+                                                                            Class<T> packetClass, BedrockPacketSerializer<T> serializer) {
+        if (codec.getPacketDefinition(packetClass) != null) {
+            builder.updateSerializer(packetClass, serializer);
+        }
+    }
+
     private static <T extends BedrockPacket> void updateSerializerIfCompatible(BedrockCodec.Builder builder, BedrockCodec codec,
                                                                                Class<T> packetClass, BedrockPacketSerializer<T> serializer) {
         BedrockPacketDefinition<T> definition = codec.getPacketDefinition(packetClass);
@@ -339,14 +346,15 @@ public class CodecProcessor {
         }
 
         if (!legacyReceiptPackets && !Boolean.getBoolean("Geyser.PartneredServerPackets")) {
-            codecBuilder.updateSerializer(RefreshEntitlementsPacket.class, IGNORED_SERIALIZER);
-            codecBuilder.updateSerializer(PurchaseReceiptPacket.class, IGNORED_SERIALIZER);
-            codecBuilder.updateSerializer(PartyChangedPacket.class, IGNORED_SERIALIZER);
+            // These packets were added over time; guard against codecs that predate them.
+            updateSerializerIfPresent(codecBuilder, codec, RefreshEntitlementsPacket.class, IGNORED_SERIALIZER);
+            updateSerializerIfPresent(codecBuilder, codec, PurchaseReceiptPacket.class, IGNORED_SERIALIZER);
+            updateSerializerIfPresent(codecBuilder, codec, PartyChangedPacket.class, IGNORED_SERIALIZER);
 
             // Added in 26.60
             if (GameProtocol.is26_60orHigher(codec.getProtocolVersion())) {
-                codecBuilder.updateSerializer(ClientboundMatchmakingStatePacket.class, IGNORED_SERIALIZER);
-                codecBuilder.updateSerializer(ServerboundMatchmakingCancelPacket.class, IGNORED_SERIALIZER);
+                updateSerializerIfPresent(codecBuilder, codec, ClientboundMatchmakingStatePacket.class, IGNORED_SERIALIZER);
+                updateSerializerIfPresent(codecBuilder, codec, ServerboundMatchmakingCancelPacket.class, IGNORED_SERIALIZER);
             }
         }
 
